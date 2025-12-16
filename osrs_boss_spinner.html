@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OSRS Boss Spinner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('https://wallpapercave.com/wp/wp8629019.jpg') no-repeat center center / cover;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: rgba(2,6,23,0.85);
+      padding: 30px;
+      border-radius: 24px;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.7);
+      text-align: center;
+      width: 1100px;
+    }
+    h1 {
+      margin-bottom: 20px;
+      font-size: 36px;
+      color: #facc15;
+      text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    }
+    canvas {
+      margin: 20px auto;
+      display: block;
+      border-radius: 50%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      background: radial-gradient(circle at center, rgba(30,41,59,0.85) 0%, rgba(2,6,23,0.85) 100%);
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: #22c55e;
+      color: #020617;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: background 0.3s, transform 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: #16a34a;
+      transform: scale(1.05);
+    }
+    button:disabled {
+      background: #4ade80;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 16px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #facc15;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    }
+    [hidden] { display: none !important; }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 50;
+    }
+    .modal-content {
+      background: radial-gradient(circle at top, #1e293b, #020617);
+      border: 4px solid #facc15;
+      border-radius: 24px;
+      padding: 32px 40px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(250,204,21,0.8);
+      animation: pop 0.4s ease-out;
+      color: #ffffff;
+      text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
+    }
+    .modal-content h2 {
+      font-size: 28px;
+      margin-bottom: 14px;
+      color: #facc15;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+    }
+    .boss-name {
+      font-size: 36px;
+      font-weight: 900;
+      margin-bottom: 20px;
+      color: #22c55e;
+      text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
+    }
+    @keyframes pop {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>OSRS Boss Wheel</h1>
+    <canvas id="wheel" width="1000" height="1000"></canvas>
+    <button id="spinBtn">Spin the Wheel</button>
+    <div class="result" id="result"></div>
+    <div class="modal" id="modal" hidden>
+      <div class="modal-content">
+        <h2>Chosen Boss</h2>
+        <div class="boss-name" id="modalBoss"></div>
+        <button id="closeModalBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BOSSES = [
+      "Abyssal Sire","Alchemical Hydra","Barrows","Bryophyta","Callisto",
+      "Calvar'ion","Cerberus","Chambers of Xeric","CoX: Challenge Mode",
+      "Chaos Elemental","Chaos Fanatic","Commander Zilyana","Corporeal Beast",
+      "Crazy Archaeologist","Dagannoth Kings","Deranged Archaeologist",
+      "Duke Sucellus","General Graardor","Giant Mole","Grotesque Guardians",
+      "Hespori","Kalphite Queen","King Black Dragon","Kraken","Kree'arra",
+      "K'ril Tsutsaroth","Mimic","Nex","Nightmare","Phantom Muspah",
+      "Sarachnis","Scorpia","Skotizo","Tempoross","The Gauntlet",
+      "Corrupted Gauntlet","The Leviathan","The Whisperer","Theatre of Blood",
+      "ToB: Hard Mode","Thermonuclear Smoke Devil","Tombs of Amascut",
+      "ToA: Expert","TzKal-Zuk","TzTok-Jad","Vardorvis","Venenatis",
+      "Vet'ion","Vorkath","Wintertodt","Zalcano","Zulrah"
+    ];
+
+    const sliceColors = [
+      '#3e2f2f', '#4b3a3a', '#5a4545', '#6b5050', '#7c5b5b', '#8d6666',
+      '#9e7171', '#af7c7c', '#c08a8a', '#d19797', '#e0a4a4', '#f1b1b1'
+    ];
+
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const spinBtn = document.getElementById("spinBtn");
+    const modal = document.getElementById("modal");
+    const modalBoss = document.getElementById("modalBoss");
+    const closeBtn = document.getElementById("closeModalBtn");
+    const resultEl = document.getElementById("result");
+
+    const size = canvas.width;
+    const radius = size / 2 - 20;
+    let angle = 0;
+    let spinning = false;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTick() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "square";
+      osc.frequency.value = 900;
+      gain.gain.value = 0.08;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.03);
+    }
+
+    const seaShanty = new Audio("https://www.dropbox.com/scl/fi/p2m93lupper0xzri8i547/Old-RuneScape-Soundtrack_-Sea-Shanty2.mp3?rlkey=pbun0904uxw4rj3jn7ejgudyt&e=1&st=5govvoqi&dl=1");
+
+    closeBtn.onclick = () => {
+      modal.hidden = true;
+      seaShanty.pause();
+      seaShanty.currentTime = 0;
+    };
+
+    function drawWheel(highlightIndex = null) {
+      ctx.clearRect(0, 0, size, size);
+      const slice = (2 * Math.PI) / BOSSES.length;
+
+      BOSSES.forEach((boss, i) => {
+        const start = angle + i * slice;
+        const end = start + slice;
+        ctx.save();
+        if (i === highlightIndex) {
+          ctx.translate(radius, radius);
+          ctx.scale(1.05, 1.05);
+          ctx.translate(-radius, -radius);
+        }
+        ctx.beginPath();
+        ctx.moveTo(radius, radius);
+        ctx.arc(radius, radius, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = sliceColors[i % sliceColors.length];
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#000000";
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(radius, radius);
+        ctx.rotate(start + slice / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 22px Arial";
+        ctx.fillText(boss, radius - 24, 6);
+        ctx.restore();
+      });
+
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.moveTo(radius - 25, 0);
+      ctx.lineTo(radius + 25, 0);
+      ctx.lineTo(radius, 50);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    drawWheel();
+
+    spinBtn.onclick = () => {
+      if (spinning) return;
+      spinning = true;
+      modal.hidden = true;
+      spinBtn.disabled = true;
+
+      const spinAngle = Math.random() * 3600 + 1800;
+      const duration = 3000;
+      const start = performance.now();
+      let lastIndex = null;
+
+      function animate(time) {
+        const progress = Math.min((time - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        angle = (spinAngle * ease * Math.PI) / 180;
+        const slice = (2 * Math.PI) / BOSSES.length;
+        const adjustedAngle = (angle + Math.PI / 2) % (2 * Math.PI);
+        const currentIndex = Math.floor(((2 * Math.PI - adjustedAngle) % (2 * Math.PI)) / slice);
+        if (currentIndex !== lastIndex) {
+          playTick();
+          lastIndex = currentIndex;
+        }
+        drawWheel();
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          const index = currentIndex;
+          drawWheel(index);
+          modalBoss.textContent = BOSSES[index];
+          modal.hidden = false;
+          spinning = false;
+          spinBtn.disabled = false;
+          seaShanty.currentTime = 0;
+          seaShanty.play();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    };
+  </script>
+</body>
+</html>
