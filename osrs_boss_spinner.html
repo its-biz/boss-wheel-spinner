@@ -160,7 +160,7 @@
       const gain = audioCtx.createGain();
       osc.type = "square";
       osc.frequency.value = 900;
-      gain.gain.value = 0.08;
+      gain.gain.value = 0.03; // reduced from 0.08 for softer sound
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start();
